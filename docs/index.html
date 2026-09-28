@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamTouch Web UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>StreamTouch</h1>
+        <button id="connectBtn">Connect</button>
+        <button id="rebootBtn" style="display: none;">Done / Save & Reboot</button>
+        <span id="status">Disconnected</span>
+    </header>
+    
+    <div class="container">
+        <div class="grid-container">
+            <div class="macropad-grid">
+                <div class="btn-slot" data-slot="0"><div class="slot-icon"></div><span class="slot-label">Slot 0</span></div>
+                <div class="btn-slot" data-slot="1"><div class="slot-icon"></div><span class="slot-label">Slot 1</span></div>
+                <div class="btn-slot" data-slot="2"><div class="slot-icon"></div><span class="slot-label">Slot 2</span></div>
+                <div class="btn-slot" data-slot="3"><div class="slot-icon"></div><span class="slot-label">Slot 3</span></div>
+                <div class="btn-slot" data-slot="4"><div class="slot-icon"></div><span class="slot-label">Slot 4</span></div>
+                <div class="btn-slot" data-slot="5"><div class="slot-icon"></div><span class="slot-label">Slot 5</span></div>
+                <div class="btn-slot" data-slot="6"><div class="slot-icon"></div><span class="slot-label">Slot 6</span></div>
+                <div class="btn-slot" data-slot="7"><div class="slot-icon"></div><span class="slot-label">Slot 7</span></div>
+            </div>
+        </div>
+        
+        <div class="inspector" id="inspector">
+            <h2>Inspector / Drop Zone</h2>
+            <div style="margin-bottom: 20px;">
+                <h3>Edit Slot Configuration</h3>
+                <div id="configForm" style="display: none;">
+                    <div style="margin-bottom: 15px;">
+                        <label class="form-label">Label: <input type="text" id="configLabel" class="glass-input"></label>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label class="form-label">Action Type:</label>
+                        <label class="radio-label"><input type="radio" name="actionType" value="keys" checked class="glass-radio"> Keys</label>
+                        <label class="radio-label"><input type="radio" name="actionType" value="media" class="glass-radio"> Media</label>
+                        <label class="radio-label"><input type="radio" name="actionType" value="application" class="glass-radio"> Application</label>
+                    </div>
+                    
+                    <div id="mediaContainer" style="display: none; margin-bottom: 15px;">
+                        <label class="form-label">Media Action: 
+                            <select id="mediaAction" class="glass-select">
+                                <option value="MEDIA_PLAY_PAUSE">Play/Pause</option>
+                                <option value="MEDIA_STOP">Stop</option>
+                                <option value="MEDIA_NEXT">Next Track</option>
+                                <option value="MEDIA_PREV">Previous Track</option>
+                                <option value="MEDIA_VOLUME_MUTE">Mute</option>
+                                <option value="MEDIA_VOLUME_UP">Volume Up</option>
+                                <option value="MEDIA_VOLUME_DOWN">Volume Down</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div id="appContainer" style="display: none; margin-bottom: 15px;">
+                        <label class="form-label">Application Action: 
+                            <select id="appAction" class="glass-select">
+                                <option value="APP_BROWSER">Web Browser</option>
+                                <option value="APP_CALCULATOR">Calculator</option>
+                                <option value="APP_EMAIL">Email</option>
+                                <option value="APP_FILE_EXPLORER">File Explorer</option>
+                            </select>
+                        </label>
+                    </div>
+                    
+                    <div id="keysContainer" style="margin-bottom: 15px;">
+                        <label class="form-label">Keys: 
+                            <button type="button" id="addKeyBtn" class="glass-btn small-btn">+</button>
+                            <button type="button" id="recordMacroBtn" class="glass-btn" style="margin-left: 10px;">Record Macro</button>
+                        </label>
+                        <div id="keysList" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+                <button id="saveConfigBtn" class="glass-btn primary-btn" style="margin-top: 15px;">Save Config to Macropad</button>
+            </div>
+            <div id="drop-zone" class="drop-zone">
+                <p>Drag and drop an icon here to upload to the selected slot.</p>
+                <p style="font-size: 0.9em; color: #aaa; margin-top: 1rem;"><em>Select a slot on the left before dropping an image.</em></p>
+                <button id="clearIconBtn" class="glass-btn" style="margin-top: 10px; display: none;">Clear Icon</button>
+            </div>
+            <div id="upload-progress"></div>
+            
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 2rem 0;">
+            <h2>Global Settings (Theme)</h2>
+            <div style="margin-bottom: 20px;">
+                <label class="form-label" style="display: block; margin-bottom: 5px;">Theme Presets:</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select id="themePresetSelect" class="glass-select" style="flex: 1;">
+                        <option value="">Select a preset...</option>
+                    </select>
+                    <button id="loadPresetBtn" class="glass-btn">Load</button>
+                    <button id="deletePresetBtn" class="glass-btn" style="background-color: rgba(255, 60, 60, 0.2); display: none;">Delete</button>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="presetNameInput" class="glass-input" placeholder="New preset name..." style="flex: 1;">
+                    <button id="savePresetBtn" class="glass-btn">Save</button>
+                </div>
+            </div>
+            <div id="themeForm">
+                <h3 style="margin-top: 15px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">Normal Colors</h3>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Background:</label>
+                    <div>
+                        <input type="color" id="themeBgColor" value="#2A2A2A" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeBgText" value="#2A2A2A" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Button:</label>
+                    <div>
+                        <input type="color" id="themeButtonColor" value="#2A2A2A" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeButtonText" value="#2A2A2A" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Border:</label>
+                    <div>
+                        <input type="color" id="themeBorderColor" value="#008080" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeBorderText" value="#008080" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Text:</label>
+                    <div>
+                        <input type="color" id="themeTextColor" value="#ffffff" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeTextText" value="#ffffff" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Icon:</label>
+                    <div>
+                        <input type="color" id="themeIconColor" value="#008080" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeIconText" value="#008080" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 25px; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">Action/Pressed Colors</h3>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Animation:</label>
+                    <div>
+                        <input type="color" id="themePressColor" value="#008080" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themePressText" value="#008080" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Border Press:</label>
+                    <div>
+                        <input type="color" id="themeBorderPressColor" value="#008080" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeBorderPressText" value="#008080" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Text Press:</label>
+                    <div>
+                        <input type="color" id="themeTextPressColor" value="#000000" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeTextPressText" value="#000000" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Icon Press:</label>
+                    <div>
+                        <input type="color" id="themeIconPressColor" value="#000000" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeIconPressText" value="#000000" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" style="margin: 0;">Button Press:</label>
+                    <div>
+                        <input type="color" id="themeAnimColor" value="#008080" class="glass-input" style="width: 50px; padding: 0; height: 30px; vertical-align: middle;">
+                        <input type="text" id="themeAnimText" value="#008080" class="glass-input" style="width: 80px; margin-left: 5px; vertical-align: middle;">
+                    </div>
+                </div>
+                <button id="saveThemeBtn" class="glass-btn primary-btn" style="margin-top: 15px;">Save Theme</button>
+                <button id="updatePresetBtn" class="glass-btn" style="margin-top: 10px; display: none; width: 100%;">Update Preset</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

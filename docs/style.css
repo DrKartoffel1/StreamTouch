@@ -1,0 +1,365 @@
+:root {
+    --theme-bg: #2A2A2A;
+    --theme-icon: #008080;
+    --theme-button: #333333;
+    --theme-border: #008080;
+    --theme-press: #008080;
+    --theme-text: #ffffff;
+    --theme-anim: #008080;
+    --theme-text-press: #000000;
+    --theme-icon-press: #000000;
+    --theme-border-press: #008080;
+    
+    --teal-accent: var(--theme-icon);
+    --bg-color: var(--theme-bg);
+    --text-color: var(--theme-text);
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+header h1 {
+    margin: 0;
+    margin-right: 2rem;
+}
+
+#connectBtn {
+    background-color: var(--teal-accent);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+#status {
+    margin-left: 1rem;
+    color: #ccc;
+}
+
+.container {
+    display: flex;
+    padding: 2rem;
+    gap: 2rem;
+    justify-content: center;
+    align-items: flex-start;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.grid-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.macropad-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 120px);
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 600px;
+}
+
+.btn-slot {
+    background: var(--theme-button);
+    border: 2px solid var(--theme-border);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    color: var(--theme-text);
+}
+
+.btn-slot:hover,
+.btn-slot.selected,
+.btn-slot:active {
+    background-color: var(--theme-press);
+    border-color: var(--theme-border-press);
+    color: var(--theme-text-press);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 128, 128, 0.5);
+}
+
+.btn-slot .slot-icon {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 8px;
+    display: none; /* Hidden by default if no src */
+    background-color: var(--theme-icon);
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    transition: background-color 0.3s ease;
+}
+
+.btn-slot:hover .slot-icon,
+.btn-slot.selected .slot-icon,
+.btn-slot:active .slot-icon {
+    background-color: var(--theme-icon-press);
+}
+
+.btn-slot .slot-label {
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    word-break: break-word;
+}
+
+.inspector {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+}
+
+.drop-zone {
+    border: 2px dashed var(--btn-border);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    margin-top: 1rem;
+    transition: all 0.2s;
+}
+
+.drop-zone.drag-over {
+    border-color: var(--teal-accent);
+    background-color: rgba(0, 128, 128, 0.1);
+}
+
+/* =========================================
+   Glassmorphism Inspector Form Styling
+   ========================================= */
+
+.inspector h2, .inspector h3 {
+    margin-top: 0;
+    font-weight: 500;
+}
+
+.form-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #eee;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.glass-input, .glass-select {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    outline: none;
+    box-sizing: border-box;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
+    flex: 1; 
+    width: 100%;
+}
+
+.glass-input:focus, .glass-select:focus {
+    border-color: var(--teal-accent);
+    box-shadow: 0 0 10px rgba(0, 128, 128, 0.4), inset 0 2px 5px rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.glass-select {
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+    padding-right: 36px;
+    cursor: pointer;
+}
+
+.glass-select option {
+    background: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* Radio Buttons */
+.radio-label {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 15px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #ddd;
+}
+
+.glass-radio {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    outline: none;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.glass-radio:checked {
+    border-color: var(--teal-accent);
+    background: var(--teal-accent);
+    box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 128, 128, 0.5);
+}
+
+/* Glass Buttons */
+.glass-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-color);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.glass-btn:hover {
+    background: rgba(0, 128, 128, 0.15);
+    border-color: var(--teal-accent);
+    box-shadow: 0 0 10px rgba(0, 128, 128, 0.3);
+}
+
+.glass-btn:active {
+    background: rgba(0, 128, 128, 0.3);
+    transform: translateY(1px);
+}
+
+.primary-btn {
+    background: rgba(0, 128, 128, 0.2);
+    border-color: var(--teal-accent);
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.primary-btn:hover {
+    background: rgba(0, 128, 128, 0.4);
+    box-shadow: 0 0 15px rgba(0, 128, 128, 0.5);
+}
+
+.small-btn {
+    padding: 4px 10px;
+    margin-left: auto;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 6px;
+    background: rgba(0, 128, 128, 0.2);
+    border-color: var(--teal-accent);
+}
+
+/* Dynamic Keys List items from app.js */
+#keysList div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px !important;
+}
+
+#keysList input {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    outline: none;
+    box-sizing: border-box;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
+    flex: 1;
+    margin: 0 !important;
+}
+
+#keysList input:focus {
+    border-color: var(--teal-accent);
+    box-shadow: 0 0 10px rgba(0, 128, 128, 0.4), inset 0 2px 5px rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.6);
+}
+
+#keysList button {
+    background: rgba(255, 60, 60, 0.1);
+    border: 1px solid rgba(255, 60, 60, 0.3);
+    padding: 8px 14px;
+    border-radius: 6px;
+    color: #ff8888;
+    font-weight: bold;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 0 !important;
+}
+
+#keysList button:hover {
+    background: rgba(255, 60, 60, 0.2);
+    border-color: rgba(255, 60, 60, 0.6);
+    box-shadow: 0 0 10px rgba(255, 60, 60, 0.3);
+    color: #ffffff;
+}
+
+/* Update Drop Zone for Glassmorphism */
+.drop-zone {
+    background: rgba(0, 0, 0, 0.2);
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    box-shadow: inset 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.drop-zone:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.drop-zone.drag-over {
+    border-color: var(--teal-accent);
+    background-color: rgba(0, 128, 128, 0.15);
+    box-shadow: inset 0 0 15px rgba(0, 128, 128, 0.2);
+}
