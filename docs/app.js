@@ -5,7 +5,20 @@ let readerAbortController = null;
 let isSyncing = false;
 let hasSynced = false;
 let selectedSlot = -1;
-let macrosData = { tiles: Array(8).fill().map(() => ({})), theme: {} };
+const classicPresets = {
+    "Kartoffel": { icon: "#008080", button: "#2A2A2A", background: "#0d0d0d", border: "#008080", text: "#ffffff", button_press: "#008080", border_pressed: "#008080", text_pressed: "#ffffff", icon_pressed: "#008080", animation: "#1a1a1a" },
+    "Dracula": { icon: "#ff79c6", button: "#44475a", background: "#282a36", border: "#bd93f9", text: "#f8f8f2", button_press: "#ff79c6", border_pressed: "#ff79c6", text_pressed: "#282a36", icon_pressed: "#282a36", animation: "#ff79c6" },
+    "Nord": { icon: "#88c0d0", button: "#3b4252", background: "#2e3440", border: "#81a1c1", text: "#d8dee9", button_press: "#88c0d0", border_pressed: "#88c0d0", text_pressed: "#2e3440", icon_pressed: "#2e3440", animation: "#88c0d0" },
+    "Monokai": { icon: "#a6e22e", button: "#3e3d32", background: "#272822", border: "#f92672", text: "#f8f8f2", button_press: "#a6e22e", border_pressed: "#a6e22e", text_pressed: "#272822", icon_pressed: "#272822", animation: "#a6e22e" },
+    "Solarized Dark": { icon: "#2aa198", button: "#073642", background: "#002b36", border: "#268bd2", text: "#839496", button_press: "#2aa198", border_pressed: "#2aa198", text_pressed: "#002b36", icon_pressed: "#002b36", animation: "#2aa198" },
+    "Gruvbox": { icon: "#b8bb26", button: "#3c3836", background: "#282828", border: "#fabd2f", text: "#ebdbb2", button_press: "#b8bb26", border_pressed: "#b8bb26", text_pressed: "#282828", icon_pressed: "#282828", animation: "#b8bb26" }
+};
+
+let macrosData = {
+    tiles: Array(8).fill().map(() => ({})),
+    theme: JSON.parse(JSON.stringify(classicPresets["Kartoffel"])),
+    theme_presets: JSON.parse(JSON.stringify(classicPresets))
+};
 
 const themeProps = ['Icon', 'Button', 'Bg', 'Border', 'Text', 'Press', 'BorderPress', 'TextPress', 'IconPress', 'Anim'];
 const themeKeys = ['icon', 'button', 'background', 'border', 'text', 'button_press', 'border_pressed', 'text_pressed', 'icon_pressed', 'animation'];
@@ -263,44 +276,10 @@ async function readLoop(readableStream) {
                                         if (!Array.isArray(macrosData.tiles)) macrosData.tiles = [];
                                         while (macrosData.tiles.length < 8) macrosData.tiles.push({});
                                         
-                                        if (!macrosData.theme_presets) macrosData.theme_presets = {};
-
-                                        const classicPresets = {
-                                            "Kartoffel": { icon: "#008080", button: "#2A2A2A", background: "#0d0d0d", border: "#008080", text: "#ffffff", button_press: "#008080", border_pressed: "#008080", text_pressed: "#ffffff", icon_pressed: "#008080", animation: "#1a1a1a" },
-                                            "Dracula": { icon: "#ff79c6", button: "#44475a", background: "#282a36", border: "#bd93f9", text: "#f8f8f2", button_press: "#ff79c6", border_pressed: "#ff79c6", text_pressed: "#282a36", icon_pressed: "#282a36", animation: "#ff79c6" },
-                                            "Nord": { icon: "#88c0d0", button: "#3b4252", background: "#2e3440", border: "#81a1c1", text: "#d8dee9", button_press: "#88c0d0", border_pressed: "#88c0d0", text_pressed: "#2e3440", icon_pressed: "#2e3440", animation: "#88c0d0" },
-                                            "Monokai": { icon: "#a6e22e", button: "#3e3d32", background: "#272822", border: "#f92672", text: "#f8f8f2", button_press: "#a6e22e", border_pressed: "#a6e22e", text_pressed: "#272822", icon_pressed: "#272822", animation: "#a6e22e" },
-                                            "Solarized Dark": { icon: "#2aa198", button: "#073642", background: "#002b36", border: "#268bd2", text: "#839496", button_press: "#2aa198", border_pressed: "#2aa198", text_pressed: "#002b36", icon_pressed: "#002b36", animation: "#2aa198" },
-                                            "Gruvbox": { icon: "#b8bb26", button: "#3c3836", background: "#282828", border: "#fabd2f", text: "#ebdbb2", button_press: "#b8bb26", border_pressed: "#b8bb26", text_pressed: "#282828", icon_pressed: "#282828", animation: "#b8bb26" }
-                                        };
-                                        for (const [pName, pData] of Object.entries(classicPresets)) {
-                                            macrosData.theme_presets[pName] = pData;
-                                        }
-
-                                        const themePresetSelect = document.getElementById('themePresetSelect');
-                                        if (themePresetSelect) {
-                                            themePresetSelect.innerHTML = '<option value="">Select a preset...</option>';
-                                            for (const presetName in macrosData.theme_presets) {
-                                                const opt = document.createElement('option');
-                                                opt.value = presetName;
-                                                opt.textContent = presetName;
-                                                themePresetSelect.appendChild(opt);
-                                            }
-                                        }
+                                        populateThemePresets();
                                         
                                         if (macrosData.theme) {
-                                            themeKeys.forEach((key, idx) => {
-                                                if (macrosData.theme[key]) {
-                                                    const val = macrosData.theme[key];
-                                                    const colorInput = document.getElementById(`theme${themeProps[idx]}Color`);
-                                                    const textInput = document.getElementById(`theme${themeProps[idx]}Text`);
-                                                    if (colorInput && textInput) {
-                                                        colorInput.value = val;
-                                                        textInput.value = val;
-                                                        document.documentElement.style.setProperty(themeCss[idx], val);
-                                                    }
-                                                }
-                                            });
+                                            applyThemeColors(macrosData.theme);
                                         }
 
                                         statusSpan.textContent = 'Connected & Synced';
@@ -613,7 +592,23 @@ const presetNameInput = document.getElementById('presetNameInput');
 const savePresetBtn = document.getElementById('savePresetBtn');
 const updatePresetBtn = document.getElementById('updatePresetBtn');
 
-const protectedPresets = ['Kartoffel', 'Dracula', 'Nord', 'Monokai', 'Solarized Dark', 'Gruvbox'];
+const protectedPresets = Object.keys(classicPresets);
+
+function populateThemePresets() {
+    if (!macrosData.theme_presets) macrosData.theme_presets = {};
+    for (const [pName, pData] of Object.entries(classicPresets)) {
+        macrosData.theme_presets[pName] = JSON.parse(JSON.stringify(pData));
+    }
+    if (themePresetSelect) {
+        themePresetSelect.innerHTML = '<option value="">Select a preset...</option>';
+        for (const presetName in macrosData.theme_presets) {
+            const opt = document.createElement('option');
+            opt.value = presetName;
+            opt.textContent = presetName;
+            themePresetSelect.appendChild(opt);
+        }
+    }
+}
 
 if (themePresetSelect) {
     themePresetSelect.addEventListener('change', () => {
@@ -630,7 +625,6 @@ if (themePresetSelect) {
 
 async function syncAndSaveTheme() {
     if (!writer) {
-        alert('Connect first!');
         return;
     }
     try {
@@ -658,6 +652,9 @@ function applyThemeColors(themeData) {
     });
 }
 
+populateThemePresets();
+applyThemeColors(macrosData.theme);
+
 if (loadPresetBtn) {
     loadPresetBtn.addEventListener('click', async () => {
         const presetName = themePresetSelect.value;
@@ -668,7 +665,9 @@ if (loadPresetBtn) {
         macrosData.theme = JSON.parse(JSON.stringify(macrosData.theme_presets[presetName]));
         applyThemeColors(macrosData.theme);
         await syncAndSaveTheme();
-        alert(`Loaded preset: ${presetName}`);
+        if (writer) {
+            alert(`Loaded preset: ${presetName}`);
+        }
     });
 }
 
