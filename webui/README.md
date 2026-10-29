@@ -86,9 +86,17 @@ Configuration saves validate a complete JSON object and verify staged bytes befo
 
 ## GitHub Pages and acceptance
 
-`../.github/workflows/webui-pages.yml` verifies pull requests and builds/deploys successful main-branch runs. It publishes `webui/dist` at `https://streamtouch.doerries.fyi/`. The verification job sets `PAGES_BASE=/` for builds and browser tests, so the tested deployment artifact uses root-relative asset URLs. Local development defaults to `/StreamTouch/`; set `PAGES_BASE=/` for a custom-domain root build or test run. Playwright follows the same base as Vite. No pathname routing or server rewrites are needed.
+The React source lives here; `../docs/` is the generated production site for `https://streamtouch.doerries.fyi/`. It replaces the old standalone JavaScript UI. Do not edit generated files directly. Regenerate them after source changes:
 
-Pages uses the existing custom-domain configuration; pushing to main or manually running the workflow deploys the verified build. Keep **Settings → Pages → Build and deployment → Source → GitHub Actions** selected. The existing `docs/` UI remains available as legacy source. The deployment artifact comes from `webui/dist`.
+```sh
+npm run build:pages
+```
+
+This builds for `/`, replaces `docs/` with the current bundled app, and copies `public/CNAME` plus `public/.nojekyll`. Commit the source and generated `docs/` changes together. The build deliberately clears old generated assets so obsolete bundles are removed.
+
+GitHub Pages can publish **main → /docs**, or use **GitHub Actions**. Both serve the same modern UI. `../.github/workflows/webui-pages.yml` runs verification, rebuilds `docs/`, rejects stale committed output and deploys that directory. A README-only branch deployment also serves the current editor because the legacy app is gone. Remote settings are not changed by the build.
+
+The workflow sets `PAGES_BASE=/` for verification builds and browser tests. Local development defaults to `/StreamTouch/`; Playwright follows the same `PAGES_BASE` setting as Vite. `build:pages` always uses `/` for the current custom domain. If changing the domain, update `public/CNAME` and rebuild. No pathname routing or server rewrites are needed.
 
 Automated browser coverage includes Chromium, Firefox and WebKit, editing, draft restoration, import/export, keyboard use, narrow layouts, base-path reloads and simulated serial exchanges. WebKit automation is not manual Safari acceptance; manual current Edge/Safari checks remain pending. Native tests cover rendering, touch packets, atomic presentation, BLE output, safe file commits and fragmented/cancelled serial operations. Detailed dated results and real-device verification are retained in workspace `.gsd/STATE.md` and `.gsd/verification/`, rather than duplicated here.
 

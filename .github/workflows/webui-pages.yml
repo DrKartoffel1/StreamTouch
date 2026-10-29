@@ -2,9 +2,9 @@ name: WebUI checks and GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['webui/**', '.github/workflows/webui-pages.yml']
+    paths: ['webui/**', 'docs/**', '.github/workflows/webui-pages.yml']
   pull_request:
-    paths: ['webui/**', '.github/workflows/webui-pages.yml']
+    paths: ['webui/**', 'docs/**', '.github/workflows/webui-pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,10 +36,18 @@ jobs:
         with:
           name: browser-failures
           path: webui/test-results
+      - run: npm run build:pages
+      - name: Verify committed Pages files are current
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=all -- ../docs)" ]; then
+            echo "::error::Run npm run build:pages in webui and commit docs/ with the source changes."
+            git status --short --untracked-files=all -- ../docs
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
-          path: webui/dist
+          path: docs
   deploy:
     if: github.event_name != 'pull_request'
     needs: verify

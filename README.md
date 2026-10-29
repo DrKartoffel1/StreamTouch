@@ -10,9 +10,11 @@ StreamTouch transforms a 4.3" ESP32-S3 RGB LCD into a Bluetooth HID keyboard/med
 
 You can configure your macros, customize your theme, and upload icons directly from your browser using the Web Serial API! No software installation is required.
 
-👉 **[Configure your StreamTouch here](https://DrKartoffel1.github.io/StreamTouch/)**
+👉 **[Configure your StreamTouch here](https://streamtouch.doerries.fyi/)**
 
 The modern editor supports current Chrome, Edge, Firefox and Safari for offline editing/import/export. Direct USB serial configuration requires a browser with Web Serial support, such as Chrome or Edge.
+
+The React source lives in [`webui/`](webui/README.md). The published [`docs/`](docs/) directory contains its generated production build. After changing the WebUI, run `npm run build:pages` inside `webui/` and commit both the source and generated files. GitHub Pages can serve `main` → `/docs`, or use the included Actions workflow; both publish the modern editor.
 
 ## Flashing the Firmware
 
