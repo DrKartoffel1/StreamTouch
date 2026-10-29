@@ -6,10 +6,6 @@ StreamTouch transforms a 4.3" ESP32-S3 RGB LCD into a Bluetooth HID keyboard/med
 
 > **Hardware Note:** This project is designed specifically for the **Guition JC8048W550C** board. It has only been tested and is only confirmed to be working with this exact screen.
 
-## Modern WebUI development
-
-The React/TypeScript replacement is in [`webui/`](webui/README.md), with live glass theming, local drafts, JSON import/export, and verified explicit device saves. See its README for local preview, tests, and the GitHub Pages workflow. The existing `docs/` UI remains available during acceptance. The Icons tab and wallpaper/glass settings require the accompanying firmware protocol update. The update was verified and flashed to `/dev/ttyUSB0` during development; see the WebUI README for supported image preparation, tests and hardware verification.
-
 ## WebUI Configuration
 
 You can configure your macros, customize your theme, and upload icons directly from your browser using the Web Serial API! No software installation is required.
