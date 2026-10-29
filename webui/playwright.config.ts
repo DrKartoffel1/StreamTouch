@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+const baseURL = new URL(
+  process.env.PAGES_BASE || "/StreamTouch/",
+  "http://127.0.0.1:4173",
+).href;
 export default defineConfig({
   testDir: "tests/browser",
   fullyParallel: true,
@@ -6,13 +10,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:4173/StreamTouch/",
+    baseURL,
     trace: "retain-on-failure",
   },
   webServer: {
     command:
       "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
-    url: "http://127.0.0.1:4173/StreamTouch/",
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
   },
   projects: [

@@ -86,9 +86,9 @@ Configuration saves validate a complete JSON object and verify staged bytes befo
 
 ## GitHub Pages and acceptance
 
-`../.github/workflows/webui-pages.yml` verifies pull requests and builds/deploys successful main-branch runs. It publishes `webui/dist` for `https://DrKartoffel1.github.io/StreamTouch/`. The default base is `/StreamTouch/`; set `PAGES_BASE=/ npm run build` for a custom-domain root. No pathname routing or server rewrites are needed.
+`../.github/workflows/webui-pages.yml` verifies pull requests and builds/deploys successful main-branch runs. It publishes `webui/dist` at `https://streamtouch.doerries.fyi/`. The verification job sets `PAGES_BASE=/` for builds and browser tests, so the tested deployment artifact uses root-relative asset URLs. Local development defaults to `/StreamTouch/`; set `PAGES_BASE=/` for a custom-domain root build or test run. Playwright follows the same base as Vite. No pathname routing or server rewrites are needed.
 
-After acceptance, select **Settings → Pages → Build and deployment → Source → GitHub Actions**, then push/run the workflow. Remote Pages settings have not been changed. The existing `docs/` UI remains available for the pending hosting cutover.
+Pages uses the existing custom-domain configuration; pushing to main or manually running the workflow deploys the verified build. Keep **Settings → Pages → Build and deployment → Source → GitHub Actions** selected. The existing `docs/` UI remains available as legacy source. The deployment artifact comes from `webui/dist`.
 
 Automated browser coverage includes Chromium, Firefox and WebKit, editing, draft restoration, import/export, keyboard use, narrow layouts, base-path reloads and simulated serial exchanges. WebKit automation is not manual Safari acceptance; manual current Edge/Safari checks remain pending. Native tests cover rendering, touch packets, atomic presentation, BLE output, safe file commits and fragmented/cancelled serial operations. Detailed dated results and real-device verification are retained in workspace `.gsd/STATE.md` and `.gsd/verification/`, rather than duplicated here.
 

@@ -14,6 +14,8 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      PAGES_BASE: /
     defaults:
       run:
         working-directory: webui
