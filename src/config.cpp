@@ -1,4 +1,6 @@
 #include "config.h"
+#include "surface.h"
+#include "file_store.h"
 #include <SPI.h>
 #include <SD.h>
 #include <ArduinoJson.h>
@@ -9,7 +11,7 @@ ThemeConfig g_theme = {
     0x008080, // icon (teal)
     0x2A2A2A, // button (dark gray)
     0x2A2A2A, // background (dark gray)
-    0xB5AD00, // border (teal, wait, Slice 7 says swapped hex 0xB5AD00 but the color should be Teal in defaults or whatever it was previously)
+    0xB5AD00, // border (panel channel order)
     0xB5AD00, // button_press
     0xFFFFFF, // text (white)
     0xB5AD00, // animation
@@ -28,6 +30,7 @@ static lv_fs_drv_t drv;
 static void* fs_open(lv_fs_drv_t *drv, const char *path, lv_fs_mode_t mode) {
     String p = path ? String(path) : String("");
     if (p.length() == 0 || p[0] != '/') p = "/" + p;
+    recover_stored_file(p);
     File f = SD.open(p.c_str());
     if (!f) return nullptr;
     return new File(f);
@@ -63,31 +66,28 @@ static lv_fs_res_t fs_tell(lv_fs_drv_t *drv, void *file_p, uint32_t *pos_p) {
 }
 
 bool config_load() {
+    g_surface = SurfaceConfig{};
     for (int i = 0; i < 8; i++) {
+        g_buttons[i].repeat = false;
         g_buttons[i].label = "Btn " + String(i + 1);
         g_buttons[i].icon_path = "";
         g_buttons[i].keys.clear();
         g_buttons[i].media_keys.clear();
     }
 
+    recover_stored_file("/macros.json");
     File file = SD.open("/macros.json");
     if (!file) {
         Serial.println("Failed to open /macros.json");
         return true; // Use defaults
     }
     
-    String sd_content = file.readString();
-    Serial.println("=== MACROS.JSON ===");
-    Serial.println(sd_content);
-    Serial.println("===================");
-    file.seek(0);
-
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     file.close();
     
     if (error) {
-        Serial.println("Failed to parse config.json");
+        Serial.println("Failed to parse /macros.json");
         return true;
     }
 
@@ -115,11 +115,20 @@ bool config_load() {
         if (theme["border_pressed"].is<String>()) g_theme.border_pressed = parseColor(theme["border_pressed"]);
     }
 
+    g_surface.image = theme["background_mode"] == "image";
+    g_surface.background = theme["background_image"] | "";
+    g_surface.blurred = theme["background_blur_image"] | "";
+    int alpha = theme["button_opacity"] | 160;
+    int blur = theme["button_blur"] | 0;
+    g_surface.opacity = constrain(alpha, 0, 255);
+    g_surface.blur = constrain(blur, 0, 24);
+
     JsonArray buttons = doc["tiles"];
     if (!buttons.isNull()) {
         int i = 0;
         for (JsonObject btn : buttons) {
             if (i >= 8) break;
+            g_buttons[i].repeat = btn["repeat"].is<bool>() && btn["repeat"].as<bool>();
             g_buttons[i].label = btn["label"] | String("Btn " + String(i + 1));
             String raw_path = btn["icon"] | "";
             if (raw_path.length() > 0) {
@@ -130,8 +139,6 @@ bool config_load() {
                 }
             }
             
-            g_buttons[i].keys.clear();
-            g_buttons[i].media_keys.clear();
             
             JsonArray actions = btn["actions"];
             if (!actions.isNull()) {

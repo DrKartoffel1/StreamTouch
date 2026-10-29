@@ -6,6 +6,8 @@
 
 void ble_init();
 void ble_loop();
-void ble_send_keys(const std::vector<uint16_t>& keys, const std::vector<uint16_t>& media_keys);
+void ble_release_keys();
+bool ble_connected();
+void ble_send_keys(const std::vector<uint16_t> &keys, const std::vector<uint16_t> &media_keys);
 
 #endif // BLE_MACROPAD_H

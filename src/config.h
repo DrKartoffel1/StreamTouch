@@ -16,6 +16,7 @@ struct ThemeConfig {
 };
 
 struct ButtonConfig {
+    bool repeat = false;
     String label;
     String icon_path;
     std::vector<uint16_t> keys;
