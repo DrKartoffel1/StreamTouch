@@ -36,18 +36,12 @@ jobs:
         with:
           name: browser-failures
           path: webui/test-results
-      - run: npm run build:pages
-      - name: Verify committed Pages files are current
-        run: |
-          if [ -n "$(git status --porcelain --untracked-files=all -- ../docs)" ]; then
-            echo "::error::Run npm run build:pages in webui and commit docs/ with the source changes."
-            git status --short --untracked-files=all -- ../docs
-            exit 1
-          fi
+      # The checks and browser tests build dist with PAGES_BASE=/ above.
+      # Deploy that tested build; generated docs files need not be committed.
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
-          path: docs
+          path: webui/dist
   deploy:
     if: github.event_name != 'pull_request'
     needs: verify
