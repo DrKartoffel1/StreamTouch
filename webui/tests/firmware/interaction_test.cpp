@@ -39,6 +39,21 @@ int main() {
     edge.feed(true, 100, 350, true);
     edge.feed(false, 100, 350, true);
     assert(edge.take_toggle());
+    for (int x : {10, 790}) {
+        edge.feed(true, x, 200, false);
+        edge.feed(true, x == 10 ? 130 : 670, 210, false);
+        edge.feed(false, x == 10 ? 130 : 670, 210, false);
+        assert(edge.take_page() == (x == 10 ? -1 : 1));
+        assert(edge.take_page() == 0 && !edge.take_toggle());
+    }
+    edge.feed(true, 790, 200, true);
+    edge.feed(true, 650, 200, true);
+    edge.feed(false, 650, 200, true);
+    assert(edge.take_page() == 0);
+    edge.feed(true, 790, 200, false);
+    edge.feed(true, 680, 350, false);
+    edge.feed(false, 680, 350, false);
+    assert(edge.take_page() == 0);
     std::cout << "Interaction tests passed: opt-in repeat, tick wraparound, cancel, "
                  "edge/direction/threshold isolation.\n";
 }

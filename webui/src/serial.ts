@@ -249,6 +249,27 @@ export class Device {
       );
     });
   }
+  ensurePageSupport(pages: number) {
+    return this.enqueue(async () => {
+      try {
+        const e = await this.exchange(
+          "GET_CAPABILITIES",
+          (e) => e.type === "caps",
+          undefined,
+          2500,
+        );
+        const max =
+          e.type === "caps" && e.value && typeof e.value === "object"
+            ? (e.value as Record<string, unknown>).max_pages
+            : undefined;
+        if (typeof max !== "number" || max < pages) throw Error("unsupported");
+      } catch {
+        throw Error(
+          "Update the device firmware before applying multiple pages.",
+        );
+      }
+    });
+  }
   ensureVisualSupport() {
     return this.enqueue(async () => {
       try {
@@ -413,6 +434,8 @@ export async function applyConfig(
       throw Error(
         "Choose a wallpaper and wait for its blur preview to finish.",
       );
+    if (config.tiles.length > 8)
+      await device.ensurePageSupport(config.tiles.length / 8);
     const used = referencedAssets(config);
     const prepared = Object.keys(icons).some(
       (path) => used.has(path) && path.startsWith("/backgrounds/"),

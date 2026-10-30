@@ -17,6 +17,14 @@ int main() {
         assert(!save_configuration(bad, error));
         assert(SD.nodes["/macros.json"]->data == old);
     }
+    for (int count : {64, 65}) {
+        reset();
+        std::string json = "{\"tiles\":[";
+        for (int i = 0; i < count; ++i) json += i ? ",{}" : "{}";
+        json += "]}";
+        assert(save_configuration(json.c_str(), error) == (count == 64));
+        if (count == 65) assert(SD.nodes["/macros.json"]->data == old);
+    }
     reset();
     SD.write_limit = 2;
     assert(!save_configuration("{\"tiles\":[],\"extra\":7}", error));

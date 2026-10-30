@@ -392,3 +392,33 @@ describe("prepared image transfers", () => {
     await d.close();
   });
 });
+
+describe("page firmware compatibility", () => {
+  for (const max_pages of [undefined, 8]) {
+    it(`checks support before saving pages (max=${max_pages})`, async () => {
+      const commands: string[] = [];
+      const { port } = mockPort((bytes, send) => {
+        const cmd = new TextDecoder().decode(bytes).trim();
+        commands.push(cmd);
+        if (cmd === "GET_CAPABILITIES")
+          send(enc.encode("SYNC_CAPS:" + JSON.stringify({ max_pages }) + "\n"));
+      });
+      const device = new Device(port);
+      await device.open();
+      try {
+        if (max_pages)
+          await expect(device.ensurePageSupport(8)).resolves.toBeUndefined();
+        else {
+          const c = freshConfig();
+          c.tiles.push(...Array.from({ length: 8 }, () => ({})));
+          await expect(applyConfig(device, c, {}, () => {})).rejects.toThrow(
+            "Update the device firmware",
+          );
+        }
+        expect(commands).toEqual(["GET_CAPABILITIES"]);
+      } finally {
+        await device.close();
+      }
+    });
+  }
+});

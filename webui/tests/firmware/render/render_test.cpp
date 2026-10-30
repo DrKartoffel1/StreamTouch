@@ -1,6 +1,9 @@
 #include "config.h"
 #include "display_frames.h"
 #include "icon_cache.h"
+#include "navigation.h"
+#include "navigation_pixels.h"
+#include <chrono>
 #include "lvgl.h"
 #include "surface.h"
 #include "surface_pixels.h"
@@ -12,12 +15,15 @@
 #include <cstring>
 #include <src/libs/tjpgd/tjpgd.h>
 
-ButtonConfig g_buttons[8];
+ButtonConfig g_buttons[MAX_TILES];
+unsigned g_page_count = 1;
 ThemeConfig g_theme = {0xffffff, 0xff0000, 0x0000ff, 0xffffff, 0x00ff00,
                        0xffffff, 0xff0000, 0xffffff, 0xffffff, 0xffffff};
 SurfaceConfig g_surface;
 static uint16_t framebuffers[2][800 * 480], draw_buffer[800 * 20];
 static uint16_t *screen = framebuffers[0];
+static uint16_t *thumbnail = nullptr;
+static unsigned png_opens = 0;
 static DisplayFrames frames;
 static uint16_t patch_pixels[2][163 * 195];
 static lv_image_dsc_t patch[2];
@@ -29,6 +35,7 @@ const char *surface_error() { return ""; }
 size_t surface_bytes() { return sizeof(patch_pixels); }
 void display_refresh_sync() {}
 static unsigned macro_calls = 0, key_releases = 0, brightness_saves = 0, restarts = 0;
+static std::vector<uint16_t> last_keys;
 static uint8_t brightness = 100;
 static bool connected = true;
 bool ble_connected() { return connected; }
@@ -43,7 +50,10 @@ bool device_set_brightness(uint8_t value, bool persist) {
 }
 const char *device_settings_error() { return ""; }
 void device_restart() { ++restarts; }
-void ble_send_keys(const std::vector<uint16_t> &, const std::vector<uint16_t> &) { ++macro_calls; }
+void ble_send_keys(const std::vector<uint16_t> &keys, const std::vector<uint16_t> &) {
+    ++macro_calls;
+    last_keys = keys;
+}
 
 static void require(bool condition, const char *message) {
     if (!condition) {
@@ -51,8 +61,45 @@ static void require(bool condition, const char *message) {
         exit(1);
     }
 }
+void display_begin_navigation() {
+    lv_timer_pause(lv_display_get_refr_timer(lv_display_get_default()));
+}
+uint16_t *display_navigation_buffer() { return frames.pending(); }
+void display_present_navigation() {
+    screen = frames.pending();
+    frames.presented_full_frame();
+}
+void display_end_navigation() {
+    lv_obj_invalidate(lv_screen_active());
+    lv_timer_resume(lv_display_get_refr_timer(lv_display_get_default()));
+}
+void display_copy_thumbnail(uint16_t *pixels) {
+    for (int y = 0; y < 240; ++y)
+        for (int x = 0; x < 400; ++x)
+            pixels[y * 400 + x] = screen[(y * 2) * 800 + x * 2];
+}
+void display_render_thumbnail(uint16_t *pixels) {
+    auto *front = screen;
+    std::vector<uint16_t> visible(screen, screen + 800 * 480);
+    thumbnail = pixels;
+    lv_obj_invalidate(lv_screen_active());
+    lv_refr_now(lv_display_get_default());
+    thumbnail = nullptr;
+    require(screen == front && std::equal(visible.begin(), visible.end(), screen),
+            "offscreen thumbnail capture never publishes or changes scanout");
+    lv_obj_invalidate(lv_screen_active());
+}
 static void flush(lv_display_t *display, const lv_area_t *area, uint8_t *pixels) {
     size_t stride = lv_draw_buf_width_to_stride(area->x2 - area->x1 + 1, LV_COLOR_FORMAT_RGB565);
+    if (thumbnail) {
+        for (int y = (area->y1 + 1) & ~1; y <= area->y2; y += 2) {
+            auto *row = reinterpret_cast<uint16_t *>(pixels + (y - area->y1) * stride);
+            for (int x = (area->x1 + 1) & ~1; x <= area->x2; x += 2)
+                thumbnail[(y / 2) * 400 + x / 2] = row[x - area->x1];
+        }
+        lv_display_flush_ready(display);
+        return;
+    }
     frames.stage(area->x1, area->y1, area->x2, area->y2, pixels, stride);
     if (lv_display_flush_is_last(display)) {
         screen = frames.pending();
@@ -273,6 +320,17 @@ static void test_hold_and_settings(lv_display_t *display) {
     require(ui_filter_touch(true, 110, 120), "edge gesture stays captured over macro buttons");
     require(ui_filter_touch(false, 110, 120), "gesture release stays captured");
     ui_loop();
+    require(lv_obj_is_hidden(main) && navigation_active(),
+            "animation uses a snapshot instead of live grid");
+    std::vector<uint16_t> animation_start(screen, screen + 800 * 480);
+    lv_tick_inc(160);
+    lv_anim_refr_now();
+    lv_obj_update_layout(lv_screen_active());
+    require(!std::equal(animation_start.begin(), animation_start.end(), screen),
+            "settings composite changes between frames");
+    require(!navigation_blur(), "navigation has no decorative blur");
+    lv_tick_inc(170);
+    lv_anim_refr_now();
     lv_refr_now(display);
     require(lv_obj_is_hidden(main), "swipe opens settings");
     auto *settings = lv_obj_get_child(lv_screen_active(), 1);
@@ -310,12 +368,163 @@ static void test_hold_and_settings(lv_display_t *display) {
     ui_filter_touch(false, 200, 340);
     ui_loop();
     lv_refr_now(display);
+    lv_tick_inc(350);
+    lv_anim_refr_now();
+    lv_refr_now(display);
     require(!lv_obj_is_hidden(main), "upward edge swipe returns");
     require(macro_calls == before + 4, "settings/gestures never send macros");
     require(std::equal(original.begin(), original.end(), screen),
             "return restores exact main screen");
     puts("PASS: hold timing/cancellation, edge isolation, brightness persistence, restart and "
          "pixel-identical return");
+}
+static void test_navigation_composite() {
+    alignas(4) uint16_t source[16], target[16], output[64];
+    for (int i = 0; i < 16; ++i) {
+        source[i] = uint16_t(i * 1901);
+        target[i] = uint16_t(65535 - i * 1721);
+    }
+    for (int axis = 0; axis < 4; ++axis) {
+        int dx = axis < 2 ? (axis == 0 ? 1 : -1) : 0;
+        int dy = axis >= 2 ? (axis == 2 ? 1 : -1) : 0;
+        for (int progress : {0, 256, 512, 768, 1024})
+            for (int sample_step : {1, 2}) {
+                navigation_compose(source, target, output, 4, 4, progress, dx, dy, sample_step);
+                for (int y = 0; y < 8; ++y)
+                    for (int x = 0; x < 8; ++x) {
+                        int px = (x / (sample_step * 2)) * sample_step +
+                                 (dx * progress / 256 / sample_step) * sample_step;
+                        int py = (y / (sample_step * 2)) * sample_step -
+                                 (dy * progress / 256 / sample_step) * sample_step;
+                        bool incoming = px < 0 || px >= 4 || py < 0 || py >= 4;
+                        px = (px + 4) % 4;
+                        py = (py + 4) % 4;
+                        uint16_t pixel = (incoming ? target : source)[py * 4 + px];
+                        require(output[y * 8 + x] == pixel,
+                                "slide preserves exact source colors without blur or blending");
+                    }
+            }
+    }
+    puts("PASS: unblurred RGB565 slide, four directions, five positions and both sampling levels");
+}
+static void test_pages(lv_display_t *display, const char *fixture) {
+    static lv_fs_drv_t fs;
+    lv_fs_drv_init(&fs);
+    fs.letter = 'S';
+    fs.user_data = const_cast<char *>(fixture);
+    fs.open_cb = [](lv_fs_drv_t *driver, const char *path, lv_fs_mode_t) -> void * {
+        if (std::string(path) != "/page.png" && std::string(path) != "page.png")
+            return nullptr;
+        ++png_opens;
+        return fopen(static_cast<const char *>(driver->user_data), "rb");
+    };
+    fs.close_cb = [](lv_fs_drv_t *, void *file) {
+        fclose(static_cast<FILE *>(file));
+        return LV_FS_RES_OK;
+    };
+    fs.read_cb = [](lv_fs_drv_t *, void *file, void *buffer, uint32_t count, uint32_t *read) {
+        *read = fread(buffer, 1, count, static_cast<FILE *>(file));
+        return LV_FS_RES_OK;
+    };
+    fs.seek_cb = [](lv_fs_drv_t *, void *file, uint32_t pos, lv_fs_whence_t whence) {
+        fseek(static_cast<FILE *>(file), pos,
+              whence == LV_FS_SEEK_SET   ? SEEK_SET
+              : whence == LV_FS_SEEK_CUR ? SEEK_CUR
+                                         : SEEK_END);
+        return LV_FS_RES_OK;
+    };
+    fs.tell_cb = [](lv_fs_drv_t *, void *file, uint32_t *pos) {
+        *pos = ftell(static_cast<FILE *>(file));
+        return LV_FS_RES_OK;
+    };
+    lv_fs_drv_register(&fs);
+    for (auto &button : g_buttons)
+        button.icon_path = "S:/page.png";
+
+    g_page_count = 8;
+    for (unsigned p = 0; p < 8; ++p) {
+        g_buttons[p * 8].label = ("Page " + std::to_string(p + 1)).c_str();
+        g_buttons[p * 8].keys = {uint16_t(p + 1)};
+    }
+    ui_rebuild();
+    lv_refr_now(display);
+    auto *main = lv_obj_get_child(lv_screen_active(), 0);
+    auto swipe = [&](bool next) {
+        int x = next ? 790 : 10, end = next ? 650 : 150;
+        require(ui_filter_touch(true, x, 200), "side margin captures page gesture");
+        ui_filter_touch(true, end, 200);
+        ui_filter_touch(false, end, 200);
+        ui_loop();
+        for (int step = 0; step < 8; ++step) {
+            lv_tick_inc(40);
+            lv_anim_refr_now();
+            if (!navigation_active())
+                lv_refr_now(display);
+        }
+    };
+    std::vector<uint16_t> first_page(screen, screen + 800 * 480);
+    unsigned before = macro_calls;
+    swipe(false);
+    for (unsigned page = 0; page < 8; ++page) {
+        if (page)
+            swipe(true);
+        require(lv_obj_get_child_count(main) == 8, "only eight tiles allocated");
+        require(icon_cache_count() == (page + 1) * 8 && icon_cache_failures() == 0 &&
+                    icon_cache_bytes() <= MAX_TILES * 163 * 195,
+                "small icon masks persist across pages within their fixed bound");
+        require(navigation_bytes() <= 576000, "snapshot cache stays within fixed budget");
+        auto *button = lv_obj_get_child(main, 0);
+        auto *label = lv_obj_get_child(button, lv_obj_get_child_count(button) - 1);
+        require(std::string(lv_label_get_text(label)) == "Page " + std::to_string(page + 1),
+                "correct page displayed");
+        require(macro_calls == before + page, "swipes never execute macros");
+        lv_obj_send_event(button, LV_EVENT_PRESSED, nullptr);
+        lv_obj_send_event(button, LV_EVENT_RELEASED, nullptr);
+        lv_obj_send_event(button, LV_EVENT_CLICKED, nullptr);
+        require(last_keys == std::vector<uint16_t>{uint16_t(page + 1)},
+                "macro comes from visible page");
+    }
+    // Compare the exact settled scene after a round trip below.
+    unsigned opens_after_first_visits = png_opens;
+    swipe(true);
+    auto *page_eight = lv_obj_get_child(main, 0);
+    ui_filter_touch(true, 100, 10);
+    ui_filter_touch(true, 100, 120);
+    ui_filter_touch(false, 100, 120);
+    ui_loop();
+    require(ui_filter_touch(true, 100, 100), "touch blocked during settings slide");
+    lv_tick_inc(350);
+    lv_anim_refr_now();
+    require(ui_filter_touch(false, 100, 100), "touch begun during slide remains consumed");
+    ui_filter_touch(true, 100, 470);
+    ui_filter_touch(true, 100, 350);
+    ui_filter_touch(false, 100, 350);
+    ui_loop();
+    lv_tick_inc(350);
+    lv_anim_refr_now();
+    require(lv_obj_get_child(main, 0) == page_eight,
+            "settings preserves selected page and its cached tiles");
+    for (unsigned page = 7; page > 0; --page)
+        swipe(false);
+    require(std::equal(first_page.begin(), first_page.end(), screen),
+            "return from snapshot animation is pixel-identical to original live grid");
+    require(png_opens == opens_after_first_visits,
+            "returning to visited pages performs zero PNG opens/decodes");
+    require(icon_cache_hits() >= 56, "return navigation reuses cached masks");
+    require(lv_obj_get_x(main) == 0, "page return restores grid position");
+    require(macro_calls == before + 8, "boundaries and reverse navigation never fire macros");
+    // Configuration replacement must cancel an animation safely and return to page one.
+    ui_filter_touch(true, 790, 200);
+    ui_filter_touch(true, 650, 200);
+    ui_filter_touch(false, 650, 200);
+    ui_loop();
+    ui_rebuild();
+    lv_tick_inc(500);
+    lv_anim_refr_now();
+    lv_refr_now(display);
+    g_page_count = 1;
+    puts("PASS: eight pages, correct HID actions, side gestures, boundaries, return and animation "
+         "cancellation");
 }
 static void test_icon_cache(lv_display_t *display, const char *fixture, int box_width = 127,
                             int box_height = 120) {
@@ -406,6 +615,8 @@ int main(int argc, char **argv) {
     test_pressed_corners(display);
     test_rapid_input(display);
     test_hold_and_settings(display);
+    test_navigation_composite();
+    test_pages(display, argv[2]);
     test_icon_cache(display, argv[2]);
     for (int i = 3; i < argc; ++i)
         test_icon_cache(display, argv[i], 127, 171);

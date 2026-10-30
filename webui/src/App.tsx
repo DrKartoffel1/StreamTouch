@@ -28,6 +28,7 @@ import { IconLibrary } from "./components/IconLibrary";
 import { iconReferenced } from "./icon-library";
 import { Button } from "./components/ui/button";
 import {
+  MAX_PAGES,
   canonical,
   editAction,
   freshConfig,
@@ -111,7 +112,10 @@ export default function App() {
   const [preparingBackground, setPreparingBackground] = useState(false);
   const [deletingIcon, setDeletingIcon] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [selected, setSelected] = useState(0);
+  const [selection, setSelected] = useState(0);
+  const selected = Math.min(selection, config.tiles.length - 1);
+  const page = Math.floor(selected / 8);
+  const pageCount = config.tiles.length / 8;
   const [tab, setTab] = useState<"button" | "theme" | "icons">("button");
   const [connection, setConnection] = useState<Connection>("disconnected");
   const [notice, setNotice] = useState(
@@ -226,6 +230,10 @@ export default function App() {
       window.removeEventListener("blur", stop);
     };
   }, [recording, selected]);
+  function selectPage(next: number) {
+    setRecording(false);
+    setSelected(next * 8);
+  }
   function updateTile(patch: Partial<typeof tile>) {
     setConfig((c) => ({
       ...c,
@@ -657,17 +665,69 @@ export default function App() {
               </div>
               <span className="badge">8 KEYS · 4 × 2</span>
             </div>
-            <DevicePreview
-              config={config}
-              icons={{ ...deviceIcons, ...icons }}
-              selected={selected}
-              pressed={pressed}
-              disabled={busy}
-              onSelect={(slot) => {
-                setSelected(slot);
-                setRecording(false);
-              }}
-            />
+            <div className="page-preview">
+              <Button
+                aria-label="Previous page"
+                disabled={busy || page === 0}
+                onClick={() => selectPage(page - 1)}
+              >
+                ‹
+              </Button>
+              <DevicePreview
+                config={config}
+                icons={{ ...deviceIcons, ...icons }}
+                selected={selected}
+                pressed={pressed}
+                disabled={busy}
+                onSelect={(slot) => {
+                  setSelected(slot);
+                  setRecording(false);
+                }}
+              />
+              <Button
+                aria-label={page + 1 < pageCount ? "Next page" : "Add page"}
+                disabled={
+                  busy || (page + 1 === pageCount && pageCount === MAX_PAGES)
+                }
+                onClick={() => {
+                  if (page + 1 === pageCount)
+                    setConfig((c) => ({
+                      ...c,
+                      tiles: [
+                        ...c.tiles,
+                        ...Array.from({ length: 8 }, () => ({})),
+                      ],
+                    }));
+                  selectPage(page + 1);
+                }}
+              >
+                {page + 1 < pageCount ? "›" : "+"}
+              </Button>
+            </div>
+            <div className="page-controls">
+              <span aria-live="polite">
+                Page {page + 1} of {pageCount}
+              </span>
+              <Button
+                disabled={busy || pageCount === 1}
+                onClick={() =>
+                  confirm(
+                    `Delete page ${page + 1} and its eight buttons?`,
+                    () => {
+                      setConfig((c) => ({
+                        ...c,
+                        tiles: c.tiles.filter(
+                          (_, i) => Math.floor(i / 8) !== page,
+                        ),
+                      }));
+                      selectPage(Math.min(page, pageCount - 2));
+                    },
+                  )
+                }
+              >
+                Delete page
+              </Button>
+            </div>
             <div className="preview-footer">
               <p>
                 <span className="dot" />

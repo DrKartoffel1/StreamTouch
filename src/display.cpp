@@ -5,6 +5,7 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
 #include "icon_cache.h"
+#include "navigation.h"
 #include "touch_report.h"
 #include <Arduino.h>
 #include <TAMC_GT911.h>
@@ -34,11 +35,14 @@ static BaseType_t s_display_core;
 static uint32_t s_frames_presented = 0, s_strips = 0;
 static uint32_t s_frame_started = 0, s_last_build_us = 0, s_last_wait_us = 0;
 static bool s_building = false;
+static uint16_t *s_thumbnail = nullptr;
 static TouchReport s_touch;
 static constexpr unsigned TOUCH_PERIOD_MS = 5;
 static uint32_t clock_ms() { return millis(); }
 
 static void render_started(lv_event_t *) {
+    if (s_thumbnail)
+        return;
     s_frame_started = micros();
     s_building = true;
 }
@@ -56,8 +60,46 @@ static bool IRAM_ATTR frame_consumed(esp_lcd_panel_handle_t, const esp_lcd_rgb_p
     return wake == pdTRUE;
 }
 
+static void present_frame(bool navigation = false) {
+    configASSERT(xPortGetCoreID() == s_display_core);
+    if (s_panel_started) {
+        uint32_t started = micros();
+        // Bounce mode's draw_bitmap selects the next framebuffer without
+        // copying it. The completion IRQ latches it at a whole-frame boundary.
+        portENTER_CRITICAL(&s_present_mux);
+        s_swap_pending = true;
+        esp_err_t result = esp_lcd_panel_draw_bitmap(s_panel_handle, 0, 0, LCD_H_RES, LCD_V_RES,
+                                                     s_frames.pending());
+        portEXIT_CRITICAL(&s_present_mux);
+        ESP_ERROR_CHECK(result);
+        if (xSemaphoreTake(s_swap_complete, pdMS_TO_TICKS(1000)) != pdTRUE) {
+            Serial.println("[Display] Frame handoff timed out; refusing to overwrite scanout");
+            ESP_ERROR_CHECK(ESP_ERR_TIMEOUT);
+        }
+        s_last_wait_us = micros() - started;
+        if (navigation)
+            s_frames.presented_full_frame();
+        else
+            s_frames.presented();
+        ++s_frames_presented;
+    } else {
+        s_frames.seed_front();
+    }
+}
+
 static void lv_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *px_map) {
     configASSERT(xPortGetCoreID() == s_display_core);
+    if (s_thumbnail) {
+        size_t stride =
+            lv_draw_buf_width_to_stride(area->x2 - area->x1 + 1, LV_COLOR_FORMAT_RGB565);
+        for (int y = (area->y1 + 1) & ~1; y <= area->y2; y += 2) {
+            const auto *row = reinterpret_cast<const uint16_t *>(px_map + (y - area->y1) * stride);
+            for (int x = (area->x1 + 1) & ~1; x <= area->x2; x += 2)
+                s_thumbnail[(y / 2) * 400 + x / 2] = row[x - area->x1];
+        }
+        lv_display_flush_ready(display);
+        return;
+    }
     if (!s_building) {
         s_frame_started = micros();
         s_building = true;
@@ -67,26 +109,9 @@ static void lv_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *p
     s_frames.stage(area->x1, area->y1, area->x2, area->y2, px_map, stride);
     if (lv_display_flush_is_last(display)) {
         s_last_build_us = micros() - s_frame_started;
-        if (s_panel_started) {
-            uint32_t started = micros();
-            // Bounce mode's draw_bitmap selects the next framebuffer without
-            // copying it. The completion IRQ latches it at a whole-frame boundary.
-            portENTER_CRITICAL(&s_present_mux);
-            s_swap_pending = true;
-            esp_err_t result = esp_lcd_panel_draw_bitmap(s_panel_handle, 0, 0, LCD_H_RES, LCD_V_RES,
-                                                         s_frames.pending());
-            portEXIT_CRITICAL(&s_present_mux);
-            ESP_ERROR_CHECK(result);
-            if (xSemaphoreTake(s_swap_complete, pdMS_TO_TICKS(1000)) != pdTRUE) {
-                Serial.println("[Display] Frame handoff timed out; refusing to overwrite scanout");
-                ESP_ERROR_CHECK(ESP_ERR_TIMEOUT);
-            }
-            s_last_wait_us = micros() - started;
-            s_frames.presented();
-            ++s_frames_presented;
-        } else {
-            s_frames.seed_front();
-        }
+        if (navigation_active())
+            navigation_record_frame(s_last_build_us);
+        present_frame();
         s_building = false;
     }
     lv_display_flush_ready(display);
@@ -255,16 +280,42 @@ void display_refresh_sync() {
     lv_refr_now(NULL);
 }
 
+void display_copy_thumbnail(uint16_t *pixels) {
+    const uint16_t *front = s_frames.front();
+    for (int y = 0; y < 240; ++y)
+        for (int x = 0; x < 400; ++x)
+            pixels[y * 400 + x] = front[(y * 2) * 800 + x * 2];
+}
+void display_render_thumbnail(uint16_t *pixels) {
+    s_thumbnail = pixels;
+    lv_obj_invalidate(lv_screen_active());
+    lv_refr_now(disp);
+    s_thumbnail = nullptr;
+    lv_obj_invalidate(lv_screen_active());
+}
+void display_begin_navigation() { lv_timer_pause(lv_display_get_refr_timer(disp)); }
+uint16_t *display_navigation_buffer() { return s_frames.pending(); }
+void display_present_navigation() { present_frame(true); }
+void display_end_navigation() {
+    lv_obj_invalidate(lv_screen_active());
+    lv_timer_resume(lv_display_get_refr_timer(disp));
+    lv_timer_ready(lv_display_get_refr_timer(disp));
+}
 void display_print_status() {
     Serial.printf("SYNC_DISPLAY:{\"double_buffered\":true,\"frames\":%u,\"strips\":%u,"
                   "\"last_build_us\":%u,\"last_handoff_us\":%u,\"free_psram\":%u,"
                   "\"touch_period_ms\":5,\"refresh_period_ms\":%u,"
                   "\"icons_cached\":%u,\"icon_cache_bytes\":%u,\"icon_cache_failures\":%u,"
-                  "\"largest_psram_block\":%u,\"loop_stack_watermark\":%u}\n",
+                  "\"largest_psram_block\":%u,\"loop_stack_watermark\":%u,\"icon_cache_hits\":%u,"
+                  "\"icon_decodes\":%u,\"navigation_bytes\":%u,\"navigation_frames\":%u,"
+                  "\"navigation_blur\":%s,\"navigation_max_frame_us\":%u}\n",
                   (unsigned)s_frames_presented, (unsigned)s_strips, (unsigned)s_last_build_us,
                   (unsigned)s_last_wait_us, (unsigned)ESP.getFreePsram(), LV_DEF_REFR_PERIOD,
                   icon_cache_count(), (unsigned)icon_cache_bytes(), icon_cache_failures(),
-                  (unsigned)ESP.getMaxAllocPsram(), (unsigned)uxTaskGetStackHighWaterMark(nullptr));
+                  (unsigned)ESP.getMaxAllocPsram(), (unsigned)uxTaskGetStackHighWaterMark(nullptr),
+                  icon_cache_hits(), icon_cache_decodes(), unsigned(navigation_bytes()),
+                  navigation_frames(), navigation_blur() ? "true" : "false",
+                  unsigned(navigation_max_frame_us()));
 }
 
 void display_loop() {

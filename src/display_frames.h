@@ -25,9 +25,18 @@ class DisplayFrames {
         right_ = std::max(right_, x2);
         bottom_ = std::max(bottom_, y2);
     }
+    const uint16_t *front() const { return front_; }
     uint16_t *pending() const { return back_; }
     // Before DMA starts, populate both buffers without changing the driver's initial fb0.
     void seed_front() { synchronize(back_, front_); }
+    // Navigation overwrites the entire next frame. Its buffers need not mirror
+    // each other until the mandatory full LVGL refresh when navigation ends.
+    void presented_full_frame() {
+        std::swap(front_, back_);
+        left_ = Width;
+        top_ = Height;
+        right_ = bottom_ = -1;
+    }
     // Call ONLY after the driver has latched pending() and released the old front.
     void presented() {
         std::swap(front_, back_);

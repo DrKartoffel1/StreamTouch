@@ -37,6 +37,8 @@ export interface Config {
   theme_presets: Record<string, Theme>;
   [key: string]: unknown;
 }
+export const MAX_PAGES = 8;
+export const TILES_PER_PAGE = 8;
 export function freshConfig(): Config {
   return structuredClone({
     tiles: Array.from({ length: 8 }, () => ({})),
@@ -83,8 +85,11 @@ function validateTheme(v: unknown) {
 export function parseConfig(input: string): Config {
   const v: unknown = JSON.parse(input);
   if (!object(v)) throw Error("Configuration must be a JSON object.");
-  if (v.tiles !== undefined && (!Array.isArray(v.tiles) || v.tiles.length > 8))
-    throw Error("Expected at most eight tiles.");
+  if (
+    v.tiles !== undefined &&
+    (!Array.isArray(v.tiles) || v.tiles.length > MAX_PAGES * TILES_PER_PAGE)
+  )
+    throw Error("Expected at most 64 tiles (8 pages).");
   const tiles = (v.tiles || []) as unknown[];
   for (const t of tiles) {
     if (!object(t)) throw Error("Each tile must be an object.");
@@ -120,7 +125,10 @@ export function parseConfig(input: string): Config {
     ...v,
     tiles: [
       ...tiles,
-      ...Array.from({ length: 8 - tiles.length }, () => ({})),
+      ...Array.from(
+        { length: Math.max(8, Math.ceil(tiles.length / 8) * 8) - tiles.length },
+        () => ({}),
+      ),
     ] as Tile[],
     theme: { ...defaults.theme, ...(v.theme as object) },
     theme_presets: Object.fromEntries(

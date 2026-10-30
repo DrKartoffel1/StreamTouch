@@ -127,46 +127,52 @@ export function DevicePreview({
               className="wallpaper"
             />
           )}
-          {config.tiles.map((tile, i) => {
-            const down = pressed || active === i;
-            const text = tile.label ?? `Btn ${i + 1}`;
-            return (
-              <button
-                type="button"
-                key={i}
-                className={`device-tile ${down ? "is-pressed" : ""} ${config.theme.background_mode === "image" && blurRadius(config.theme) > 0 && config.theme.background_blur_image && icons[config.theme.background_blur_image] ? "has-blur" : ""}`}
-                aria-label={`Slot ${i + 1}${tile.label ? `: ${tile.label}` : ""}`}
-                aria-pressed={i === selected}
-                disabled={disabled}
-                onPointerDown={() => setActive(i)}
-                onPointerUp={() => setActive(null)}
-                onPointerCancel={() => setActive(null)}
-                onPointerLeave={() => setActive(null)}
-                onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") setActive(i);
-                }}
-                onKeyUp={() => setActive(null)}
-                onBlur={() => setActive(null)}
-                onClick={() => onSelect(i)}
-              >
-                {config.theme.background_mode === "image" &&
-                  blurRadius(config.theme) > 0 &&
-                  config.theme.background_blur_image &&
-                  icons[config.theme.background_blur_image] && (
-                    <Wallpaper
-                      blob={icons[config.theme.background_blur_image]}
-                      className="tile-backdrop"
-                      position={`-${30 + deviceLayout.columns.slice(0, i % 4).reduce((a, b) => a + b, 0) + (i % 4) * 30}px -${30 + Math.floor(i / 4) * 225}px`}
-                    />
-                  )}
-                {tile.icon && <DeviceIcon blob={icons[tile.icon]} />}
-                <DeviceLabel
-                  text={text}
-                  color={down ? config.theme.text_pressed : config.theme.text}
-                />
-              </button>
-            );
-          })}
+          {config.tiles
+            .slice(
+              Math.floor(selected / 8) * 8,
+              Math.floor(selected / 8) * 8 + 8,
+            )
+            .map((tile, i) => {
+              const slot = Math.floor(selected / 8) * 8 + i;
+              const down = pressed || active === slot;
+              const text = tile.label ?? `Btn ${slot + 1}`;
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  className={`device-tile ${down ? "is-pressed" : ""} ${config.theme.background_mode === "image" && blurRadius(config.theme) > 0 && config.theme.background_blur_image && icons[config.theme.background_blur_image] ? "has-blur" : ""}`}
+                  aria-label={`Slot ${slot + 1}${tile.label ? `: ${tile.label}` : ""}`}
+                  aria-pressed={slot === selected}
+                  disabled={disabled}
+                  onPointerDown={() => setActive(slot)}
+                  onPointerUp={() => setActive(null)}
+                  onPointerCancel={() => setActive(null)}
+                  onPointerLeave={() => setActive(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === " " || e.key === "Enter") setActive(slot);
+                  }}
+                  onKeyUp={() => setActive(null)}
+                  onBlur={() => setActive(null)}
+                  onClick={() => onSelect(slot)}
+                >
+                  {config.theme.background_mode === "image" &&
+                    blurRadius(config.theme) > 0 &&
+                    config.theme.background_blur_image &&
+                    icons[config.theme.background_blur_image] && (
+                      <Wallpaper
+                        blob={icons[config.theme.background_blur_image]}
+                        className="tile-backdrop"
+                        position={`-${30 + deviceLayout.columns.slice(0, i % 4).reduce((a, b) => a + b, 0) + (i % 4) * 30}px -${30 + Math.floor(i / 4) * 225}px`}
+                      />
+                    )}
+                  {tile.icon && <DeviceIcon blob={icons[tile.icon]} />}
+                  <DeviceLabel
+                    text={text}
+                    color={down ? config.theme.text_pressed : config.theme.text}
+                  />
+                </button>
+              );
+            })}
         </div>
       </div>
       <div className="device-chin">

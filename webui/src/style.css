@@ -1125,3 +1125,20 @@ dialog p {
     }
   }
 }
+
+.page-preview {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  gap: 8px;
+  align-items: center;
+}
+.page-preview > button {
+  padding: 0;
+  font-size: 24px;
+}
+.page-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}

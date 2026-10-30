@@ -1,3 +1,5 @@
+import { referencedAssets } from "../src/background";
+import { iconReferenced } from "../src/icon-library";
 import { describe, it, expect } from "vitest";
 import { freshConfig, parseConfig, editAction, canonical } from "../src/config";
 import { mapKey } from "../src/keys";
@@ -95,4 +97,35 @@ it("round trips per-button repeat without touching other actions", () => {
     ],
   });
   expect(() => parseConfig('{"tiles":[{"repeat":"yes"}]}')).toThrow("Repeat");
+});
+
+describe("pages", () => {
+  it("pads partial pages and preserves all tile fields", () => {
+    const tiles = Array.from({ length: 9 }, (_, i) => ({
+      label: `Tile ${i}`,
+      extra: i,
+    }));
+    const c = parseConfig(JSON.stringify({ tiles }));
+    expect(c.tiles).toHaveLength(16);
+    expect(c.tiles[8]).toEqual(tiles[8]);
+    expect(parseConfig(JSON.stringify(c))).toEqual(c);
+    expect(
+      parseConfig(JSON.stringify({ tiles: Array(64).fill({}) })).tiles,
+    ).toHaveLength(64);
+    expect(() =>
+      parseConfig(JSON.stringify({ tiles: Array(65).fill({}) })),
+    ).toThrow("64 tiles");
+  });
+});
+
+it("tracks icon references on the final page", () => {
+  const c = parseConfig(
+    JSON.stringify({
+      tiles: Array.from({ length: 64 }, (_, i) =>
+        i === 63 ? { icon: "/icons/last.png" } : {},
+      ),
+    }),
+  );
+  expect(referencedAssets(c).has("/icons/last.png")).toBe(true);
+  expect(iconReferenced("/icons/last.png", c)).toBe(true);
 });

@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <vector>
+#include "pages.h"
 
 struct ThemeConfig {
     uint32_t icon;
@@ -23,7 +24,8 @@ struct ButtonConfig {
     std::vector<uint16_t> media_keys;
 };
 
-extern ButtonConfig g_buttons[8];
+extern ButtonConfig g_buttons[MAX_TILES];
+extern unsigned g_page_count;
 extern ThemeConfig g_theme;
 
 bool config_init();

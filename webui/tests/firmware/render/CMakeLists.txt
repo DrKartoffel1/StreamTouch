@@ -8,7 +8,7 @@ set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(CONFIG_LV_USE_THORVG OFF CACHE BOOL "" FORCE)
 add_subdirectory("${STREAMTOUCH_ROOT}/.pio/libdeps/JC8048W550C/lvgl" lvgl)
-add_executable(render_test render_test.cpp "${STREAMTOUCH_ROOT}/src/ui.cpp" "${STREAMTOUCH_ROOT}/src/icon_cache.cpp")
+add_executable(render_test render_test.cpp "${STREAMTOUCH_ROOT}/src/ui.cpp" "${STREAMTOUCH_ROOT}/src/icon_cache.cpp" "${STREAMTOUCH_ROOT}/src/navigation.cpp")
 target_include_directories(render_test PRIVATE include "${STREAMTOUCH_ROOT}/src")
 # Firmware accepts integer part selectors; newer LVGL declares these as enums on hosts.
 target_compile_options(render_test PRIVATE -fpermissive)

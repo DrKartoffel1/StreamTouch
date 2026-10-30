@@ -125,6 +125,7 @@ void upload(const String &command) {
 bool handle_asset_command(const String &command) {
     if (command == "GET_CAPABILITIES") {
         JsonDocument doc;
+        doc["max_pages"] = 8;
         doc["cached_backgrounds"] = true;
         doc["upload_v2"] = true;
         doc["max_file_size"] = 512 * 1024;

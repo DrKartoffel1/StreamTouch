@@ -1,4 +1,5 @@
 #include "file_store.h"
+#include "pages.h"
 #include <ArduinoJson.h>
 #include <SD.h>
 #include <algorithm>
@@ -72,6 +73,11 @@ bool save_configuration(const String &json, String &error) {
         JsonInput input{json};
         if (deserializeJson(document, input) || !document.is<JsonObject>()) {
             error = "Configuration must be a valid JSON object";
+            return false;
+        }
+        if (!document["tiles"].isNull() &&
+            (!document["tiles"].is<JsonArray>() || document["tiles"].size() > MAX_TILES)) {
+            error = "Expected at most 64 tiles (8 pages)";
             return false;
         }
         for (; input.offset < json.length(); ++input.offset) {

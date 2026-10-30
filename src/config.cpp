@@ -5,8 +5,10 @@
 #include <SD.h>
 #include <ArduinoJson.h>
 #include <lvgl.h>
+#include <algorithm>
 
-ButtonConfig g_buttons[8];
+ButtonConfig g_buttons[MAX_TILES];
+unsigned g_page_count = 1;
 ThemeConfig g_theme = {
     0x008080, // icon (teal)
     0x2A2A2A, // button (dark gray)
@@ -67,7 +69,8 @@ static lv_fs_res_t fs_tell(lv_fs_drv_t *drv, void *file_p, uint32_t *pos_p) {
 
 bool config_load() {
     g_surface = SurfaceConfig{};
-    for (int i = 0; i < 8; i++) {
+    g_page_count = 1;
+    for (int i = 0; i < MAX_TILES; i++) {
         g_buttons[i].repeat = false;
         g_buttons[i].label = "Btn " + String(i + 1);
         g_buttons[i].icon_path = "";
@@ -91,6 +94,11 @@ bool config_load() {
         return true;
     }
 
+    if (!doc["tiles"].isNull() &&
+        (!doc["tiles"].is<JsonArray>() || doc["tiles"].size() > MAX_TILES)) {
+        Serial.println("Invalid tile list (maximum 8 pages / 64 tiles); using defaults");
+        return true;
+    }
     JsonObject theme = doc["theme"];
     if (!theme.isNull()) {
         auto parseColor = [](const String& hex) -> uint32_t {
@@ -125,9 +133,10 @@ bool config_load() {
 
     JsonArray buttons = doc["tiles"];
     if (!buttons.isNull()) {
+        g_page_count = std::min(unsigned(MAX_PAGES), std::max(1u, (unsigned(buttons.size()) + 7) / 8));
         int i = 0;
         for (JsonObject btn : buttons) {
-            if (i >= 8) break;
+            if (i >= MAX_TILES) break;
             g_buttons[i].repeat = btn["repeat"].is<bool>() && btn["repeat"].as<bool>();
             g_buttons[i].label = btn["label"] | String("Btn " + String(i + 1));
             String raw_path = btn["icon"] | "";

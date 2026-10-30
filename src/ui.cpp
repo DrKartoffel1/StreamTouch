@@ -6,6 +6,7 @@
 #include "edge_gesture.h"
 #include "hold_repeat.h"
 #include "icon_cache.h"
+#include "navigation.h"
 #include "surface.h"
 #include <Arduino.h>
 
@@ -28,6 +29,11 @@ void cancel_hold() {
     held_slot = -1;
     hold.cancel();
 }
+unsigned active_page = 0;
+
+bool transitioning = false;
+bool touch_blocked = false;
+void make_tiles();
 void show_settings(bool open);
 } // namespace
 
@@ -38,12 +44,13 @@ static void btn_event_cb(lv_event_t *e) {
 
     if (code == LV_EVENT_CLICKED) {
         if (!skip_click[idx])
-            ble_send_keys(g_buttons[idx].keys, g_buttons[idx].media_keys);
+            ble_send_keys(g_buttons[active_page * 8 + idx].keys,
+                          g_buttons[active_page * 8 + idx].media_keys);
     } else if (code == LV_EVENT_PRESSED) {
         cancel_hold();
         skip_click[idx] = false;
         held_slot = idx;
-        hold.press(lv_tick_get(), g_buttons[idx].repeat && ble_connected());
+        hold.press(lv_tick_get(), g_buttons[active_page * 8 + idx].repeat && ble_connected());
         if (lv_obj_get_child_count(btn) > 1) {
             lv_obj_t *img = lv_obj_get_child(btn, 0);
             lv_obj_set_style_image_recolor(img, lv_color_hex(g_theme.icon_pressed), 0);
@@ -69,11 +76,12 @@ static bool ui_initialized = false;
 
 void ui_init() {
     cancel_hold();
+    active_page = 0;
+    transitioning = touch_blocked = false;
     edge.reset();
     settings_open = false;
     settings_panel = nullptr;
     icon_cache_release();
-    lv_obj_t *slot_images[8] = {};
     if (ui_initialized) {
         lv_style_reset(&style_btn);
         lv_style_reset(&style_btn_pr);
@@ -153,6 +161,22 @@ void ui_init() {
     lv_style_set_text_color(&style_btn_pr, lv_color_hex(g_theme.text_pressed));
     lv_style_set_border_color(&style_btn_pr, lv_color_hex(g_theme.border_pressed));
 
+    make_tiles();
+}
+
+void ui_rebuild() {
+    cancel_hold();
+    navigation_reset();
+    lv_obj_clean(lv_screen_active());
+    ui_init();
+    display_refresh_sync();
+}
+
+namespace {
+void make_tiles() {
+    auto *cont = main_panel;
+    auto *scr = lv_screen_active();
+    lv_obj_t *slot_images[8] = {};
     for (int i = 0; i < 8; ++i) {
         int col = i % 4;
         int row = i / 4;
@@ -181,9 +205,13 @@ void ui_init() {
                               LV_FLEX_ALIGN_CENTER);
 
         lv_obj_t *img = nullptr;
-        if (g_buttons[i].icon_path.length() > 0) {
+        if (g_buttons[active_page * 8 + i].icon_path.length() > 0) {
             img = lv_image_create(btn);
-            lv_image_set_src(img, g_buttons[i].icon_path.c_str());
+            if (!icon_cache_attach(img, active_page * 8 + i)) {
+                lv_image_set_src(img, g_buttons[active_page * 8 + i].icon_path.c_str());
+                lv_image_set_inner_align(img, LV_IMAGE_ALIGN_CONTAIN_DOWNSCALE);
+                slot_images[i] = img;
+            }
             lv_obj_set_width(img, LV_PCT(100));
             lv_obj_set_flex_grow(img, 1);
             lv_obj_set_style_pad_bottom(img, 4, 0);
@@ -193,28 +221,15 @@ void ui_init() {
         }
 
         lv_obj_t *label = lv_label_create(btn);
-        lv_label_set_text(label, g_buttons[i].label.c_str());
-        if (img) {
-            lv_image_set_inner_align(img, LV_IMAGE_ALIGN_CONTAIN_DOWNSCALE);
-            slot_images[i] = img;
-        }
+        lv_label_set_text(label, g_buttons[active_page * 8 + i].label.c_str());
         lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_ALL, (void *)(intptr_t)i);
     }
     lv_obj_update_layout(scr);
     for (int i = 0; i < 8; ++i) {
-        if (slot_images[i] && !icon_cache_prepare(slot_images[i], i))
+        if (slot_images[i] && !icon_cache_prepare(slot_images[i], active_page * 8 + i))
             Serial.printf("[Icons] Could not prepare slot %d; using original source\n", i + 1);
     }
 }
-
-void ui_rebuild() {
-    cancel_hold();
-    lv_obj_clean(lv_screen_active());
-    ui_init();
-    display_refresh_sync();
-}
-
-namespace {
 lv_obj_t *text(lv_obj_t *parent, const char *value, int x, int y) {
     auto *label = lv_label_create(parent);
     lv_label_set_text(label, value);
@@ -302,20 +317,69 @@ void make_settings() {
     update_status();
 }
 void show_settings(bool open) {
+    if (transitioning)
+        return;
     cancel_hold();
     restart_armed = false;
     if (!settings_panel)
         make_settings();
+    int from = settings_open ? MAX_PAGES : active_page;
+    navigation_capture(from);
     settings_open = open;
-    lv_obj_set_hidden(main_panel, open);
-    lv_obj_set_hidden(settings_panel, !open);
     lv_label_set_text(restart_text, "Restart device");
     if (open)
         update_status();
+    lv_obj_set_hidden(main_panel, open);
+    lv_obj_set_hidden(settings_panel, !open);
+    transitioning = true;
+    auto done = []() {
+        lv_obj_set_hidden(main_panel, settings_open);
+        if (settings_panel)
+            lv_obj_set_hidden(settings_panel, !settings_open);
+        transitioning = false;
+    };
+    if (navigation_start(from, open ? MAX_PAGES : active_page, 0, open ? 1 : -1, done)) {
+        lv_obj_set_hidden(main_panel, true);
+        lv_obj_set_hidden(settings_panel, true);
+    } else {
+        Serial.printf("[Navigation] Snapshot allocation unavailable; showing settings directly\n");
+        done();
+    }
 }
 } // namespace
-bool ui_filter_touch(bool pressed, int x, int y) { return edge.feed(pressed, x, y, settings_open); }
+bool ui_filter_touch(bool pressed, int x, int y) {
+    if (transitioning) {
+        touch_blocked = pressed;
+        return true;
+    }
+    if (touch_blocked) {
+        touch_blocked = pressed;
+        return true;
+    }
+    return edge.feed(pressed, x, y, settings_open);
+}
 void ui_loop() {
+    int direction = edge.take_page();
+    int next = int(active_page) + direction;
+    if (direction && !settings_open && !transitioning && next >= 0 && next < int(g_page_count)) {
+        cancel_hold();
+        navigation_capture(active_page);
+        int from = active_page;
+        lv_obj_clean(main_panel);
+        active_page = next;
+        make_tiles();
+        transitioning = true;
+        auto done = []() {
+            lv_obj_set_hidden(main_panel, false);
+            transitioning = false;
+        };
+        if (navigation_start(from, next, direction, 0, done))
+            lv_obj_set_hidden(main_panel, true);
+        else {
+            Serial.printf("[Navigation] Snapshot allocation unavailable; showing page directly\n");
+            done();
+        }
+    }
     if (edge.take_toggle())
         show_settings(!settings_open);
     if (settings_open && restart_armed && uint32_t(lv_tick_get() - restart_time) >= 4000) {
@@ -329,6 +393,7 @@ void ui_loop() {
             return;
         }
         if (hold.poll(lv_tick_get()))
-            ble_send_keys(g_buttons[held_slot].keys, g_buttons[held_slot].media_keys);
+            ble_send_keys(g_buttons[active_page * 8 + held_slot].keys,
+                          g_buttons[active_page * 8 + held_slot].media_keys);
     }
 }
