@@ -12,9 +12,7 @@ You can configure your macros, customize your theme, and upload icons directly f
 
 👉 **[Configure your StreamTouch here](https://streamtouch.doerries.fyi/)**
 
-The modern editor supports current Chrome, Edge, Firefox and Safari for offline editing/import/export. Direct USB serial configuration requires a browser with Web Serial support, such as Chrome or Edge.
-
-The React source lives in [`webui/`](webui/README.md). The published [`docs/`](docs/) directory contains its generated production build. After changing the WebUI, run `npm run build:pages` inside `webui/` and commit both the source and generated files. GitHub Pages can serve `main` → `/docs`, or use the included Actions workflow; both publish the modern editor.
+The editor supports current Chrome, Edge, Firefox and Safari for offline editing/import/export. Direct USB serial configuration requires a browser with Web Serial support, such as Chrome or Edge.
 
 ## Flashing the Firmware
 
@@ -26,7 +24,7 @@ This project uses PlatformIO. To flash the firmware to your ESP32-S3:
 
 Alternatively, from the command line:
 ```bash
-pio run -e JC8048W550C -t upload --upload-port /dev/ttyUSB0
+pio run -e JC8048W550C -t upload
 ```
 
 *Important: Make sure you click "Disconnect" in the WebUI before flashing, otherwise the Serial port will be busy!*
